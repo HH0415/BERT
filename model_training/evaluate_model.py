@@ -1,29 +1,25 @@
-import os
-from transformers import BertTokenizer, BertForSequenceClassification, Trainer
-from model_training.data_processing import load_and_process_data
-from sklearn.metrics import confusion_matrix, classification_report
 import numpy as np
-import seaborn as sns
+from transformers import BertForSequenceClassification, Trainer
+from sklearn.metrics import confusion_matrix, classification_report
+from model_training.data_processing import ensure_dir_exists, load_and_process_data  
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-def ensure_dir_exists(directory):
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-def plot_confusion_matrix(cm, labels, save_path):
-    """生成並保存混淆矩陣的圖表"""
-    plt.figure(figsize=(8, 6))
+def plot_confusion_matrix(cm, labels, output_path):
+    """繪製混淆矩陣並保存圖像"""
+    plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
     plt.title('Confusion Matrix')
-    plt.savefig(save_path)
-    plt.close()
+    plt.savefig(output_path)
+    plt.close()  # 關閉圖形以釋放內存
 
-def evaluate_model(test_file):
-    """評估訓練好的BERT模型"""
-    ensure_dir_exists('./results')  # 確保目錄存在
-    encoded_dataset = load_and_process_data('./data/train.csv', test_file)
+def evaluate_model(test_dataset, keyword_file):
+    """評估訓練好的 BERT 模型"""
+    ensure_dir_exists('./results')  # 確保結果目錄存在
+
+    encoded_dataset = load_and_process_data(test_dataset, keyword_file)
 
     model = BertForSequenceClassification.from_pretrained('./bert_fraud_model')
 
@@ -33,7 +29,7 @@ def evaluate_model(test_file):
     )
 
     evaluation_results = trainer.evaluate()
-    print(evaluation_results)
+    print("Evaluation results:", evaluation_results)
 
     predictions = trainer.predict(encoded_dataset['test'])
     predictions_labels = np.argmax(predictions.predictions, axis=1)
@@ -55,4 +51,8 @@ def evaluate_model(test_file):
     plot_confusion_matrix(cm, ['Normal', 'Fraud'], './results/confusion_matrix.png')
 
 if __name__ == "__main__":
-    evaluate_model('./data/test.csv')
+    # 測試數據集和關鍵字文件的路徑
+    test_dataset_path = './data/test.csv'
+    keyword_file_path = './keywords.txt'
+    
+    evaluate_model(test_dataset_path, keyword_file_path)
