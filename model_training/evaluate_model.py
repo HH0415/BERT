@@ -1,27 +1,26 @@
 import numpy as np
-from transformers import BertForSequenceClassification, Trainer
 from sklearn.metrics import confusion_matrix, classification_report
-from model_training.data_processing import ensure_dir_exists, load_and_process_data  
+from transformers import BertForSequenceClassification, Trainer
+from model_training.data_processing import load_and_process_data, ensure_dir_exists
 import matplotlib.pyplot as plt
 import seaborn as sns
+import torch
 
 def plot_confusion_matrix(cm, labels, output_path):
-    """繪製混淆矩陣並保存圖像"""
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix')
     plt.savefig(output_path)
-    plt.close()  # 關閉圖形以釋放內存
+    plt.close()
 
-def evaluate_model(test_dataset, keyword_file):
-    """評估訓練好的 BERT 模型"""
-    ensure_dir_exists('./results')  # 確保結果目錄存在
+def evaluate_model(test_file, keyword_file):
+    ensure_dir_exists('./results')
+    
+    encoded_dataset = load_and_process_data('./data/train.csv', test_file, keyword_file)
 
-    encoded_dataset = load_and_process_data(test_dataset, keyword_file)
-
-    model = BertForSequenceClassification.from_pretrained('./bert_fraud_model')
+    model = BertForSequenceClassification.from_pretrained('./bert_fraud_model').to('cuda')
 
     trainer = Trainer(
         model=model,
@@ -29,8 +28,8 @@ def evaluate_model(test_dataset, keyword_file):
     )
 
     evaluation_results = trainer.evaluate()
-    print("Evaluation results:", evaluation_results)
-
+    print("評估結果:", evaluation_results)
+    
     predictions = trainer.predict(encoded_dataset['test'])
     predictions_labels = np.argmax(predictions.predictions, axis=1)
     
@@ -39,20 +38,12 @@ def evaluate_model(test_dataset, keyword_file):
     cm = confusion_matrix(true_labels, predictions_labels)
     report = classification_report(true_labels, predictions_labels, target_names=['Normal', 'Fraud'])
 
-    # 保存文本報告
     with open('./results/confusion_matrix.txt', 'w') as f:
-        f.write("Confusion Matrix:\n")
+        f.write("混淆矩陣:\n")
         f.write(np.array2string(cm))
 
     with open('./results/classification_report.txt', 'w') as f:
-        f.write("Classification Report:\n")
+        f.write("分類報告:\n")
         f.write(report)
 
     plot_confusion_matrix(cm, ['Normal', 'Fraud'], './results/confusion_matrix.png')
-
-if __name__ == "__main__":
-    # 測試數據集和關鍵字文件的路徑
-    test_dataset_path = './data/test.csv'
-    keyword_file_path = './keywords.txt'
-    
-    evaluate_model(test_dataset_path, keyword_file_path)
